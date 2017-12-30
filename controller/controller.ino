@@ -21,8 +21,8 @@ All text above, and the splash screen must be included in any redistribution
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-#define OLED_RESET 4
-Adafruit_SSD1306 display(OLED_RESET);
+//#define OLED_RESET 4
+Adafruit_SSD1306 display(4);
 
 int joyPin1 = 0;                 // slider variable connecetd to analog pin 0
 int joyPin2 = 1;                 // slider variable connecetd to analog pin 1
@@ -40,8 +40,8 @@ void setup()   {
   // Show image buffer on the display hardware.
   // Since the buffer is intialized with an Adafruit splashscreen
   // internally, this will display the splashscreen.
-  display.display();
-  delay(2000);
+ // display.display();
+  //delay(2000);
 
   // Clear the buffer.
   display.clearDisplay();
@@ -59,12 +59,12 @@ void setup()   {
   display.setTextSize(1);
   display.setTextColor(WHITE);
   display.setCursor(0,0);
-  display.println("Hello, world!");
+  display.println(F("Hello, world!"));
   display.setTextColor(BLACK, WHITE); // 'inverted' text
   display.setTextSize(2);
   display.setTextColor(WHITE);
-  display.println("from"); 
-  display.println("TERRIERBOT");
+  display.println(F("from")); 
+  display.println(F("TERRIERBOT"));
   display.display();
   delay(2000);
   display.clearDisplay();
@@ -86,46 +86,20 @@ void loop() {
   Serial.print(" : ");
   Serial.print(value2);
   Serial.println("");
-}
-
-
-
-void testdrawchar(void) {
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-
-  for (uint8_t i=0; i < 168; i++) {
-    if (i == '\n') continue;
-    display.write(i);
-    if ((i > 0) && (i % 21 == 0))
-      display.println();
-  }    
-  display.display();
-  delay(1);
-}
-
-
-void testscrolltext(void) {
-  display.setTextSize(2);
-  display.setTextColor(WHITE);
-  display.setCursor(10,0);
+  String labelX = "X: ";
+  String labelY = "Y: ";
+  String xState = labelX + value1;
+  String yState = labelY + value2;
+  Serial.println(xState);
+  Serial.println(yState);
   display.clearDisplay();
-  display.println("scroll");
+  display.setCursor(0,0);
+  display.setTextSize(1);
+  display.println(xState);
+  display.println(yState);
+  display.setCursor(0,56);
+  display.println("terrierbot v0.1");
   display.display();
-  delay(1);
- 
-  display.startscrollright(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrollleft(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);    
-  display.startscrolldiagright(0x00, 0x07);
-  delay(2000);
-  display.startscrolldiagleft(0x00, 0x07);
-  delay(2000);
-  display.stopscroll();
+  delay(100);
 }
+
