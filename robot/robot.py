@@ -7,6 +7,7 @@
 
 import sys, smbus, time, math, datetime, math, datetime
 from LSM9DS0 import *
+from time import sleep
 
 bus = smbus.SMBus(1)
 
@@ -235,14 +236,138 @@ class imuSystem:
 		mag_medianTable2Y = [1] * MAG_MEDIANTABLESIZE
 		mag_medianTable2Z = [1] * MAG_MEDIANTABLESIZE
 
+		IMU_upside_down = 0     # Change calculations depending on IMu orientation.
+                                                # 0 = Correct side up. This is when the skull logo is facing down
+                                                # 1 = Upside down. This is when the skull logo is facing up
+
+
 	def readMagneometer(self):
 		MAGx = self.readMAGx()
         	MAGy = self.readMAGy()
        		MAGz = self.readMAGz()
 		
-		return MAGz
+		return MAGx
+
+	def readACCx(self):
+        	acc_l = bus.read_byte_data(ACC_ADDRESS, OUT_X_L_A)
+                acc_h = bus.read_byte_data(ACC_ADDRESS, OUT_X_H_A)
+                acc_combined = (acc_l | acc_h <<8)
+
+                return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+	def readACCy(self):
+                acc_l = bus.read_byte_data(ACC_ADDRESS, OUT_Y_L_A)
+                acc_h = bus.read_byte_data(ACC_ADDRESS, OUT_Y_H_A)
+                acc_combined = (acc_l | acc_h <<8)
+
+                return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+	def readACCx(self):
+                acc_l = bus.read_byte_data(ACC_ADDRESS, OUT_X_L_A)
+                acc_h = bus.read_byte_data(ACC_ADDRESS, OUT_X_H_A)
+                acc_combined = (acc_l | acc_h <<8)
+
+                return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+        def readACCy(self):
+        	acc_l = bus.read_byte_data(ACC_ADDRESS, OUT_Y_L_A)
+                acc_h = bus.read_byte_data(ACC_ADDRESS, OUT_Y_H_A)
+                acc_combined = (acc_l | acc_h <<8)
+
+                return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+
+	def getBearing(self):
+		
+		ACCx = self.readACCx()
+        	ACCy = self.readACCy()
+		MAGx = self.readMAGx()
+                MAGy = self.readMAGy()
+                MAGz = self.readMAGz()
+		ACC_MEDIANTABLESIZE = 9         # Median filter table size for accelerometer. Higher = smoother but a longer delay
+        	MAG_MEDIANTABLESIZE = 9
+		RAD_TO_DEG = 57.29578
+	        M_PI = 3.14159265358979323846
+
+
+		#Setup the tables for the mdeian filter. Fill them all with '1' soe we dont get device by zero error
+                acc_medianTable1X = [1] * ACC_MEDIANTABLESIZE
+                acc_medianTable1Y = [1] * ACC_MEDIANTABLESIZE
+                acc_medianTable1Z = [1] * ACC_MEDIANTABLESIZE
+                acc_medianTable2X = [1] * ACC_MEDIANTABLESIZE
+                acc_medianTable2Y = [1] * ACC_MEDIANTABLESIZE
+                acc_medianTable2Z = [1] * ACC_MEDIANTABLESIZE
+                mag_medianTable1X = [1] * MAG_MEDIANTABLESIZE
+                mag_medianTable1Y = [1] * MAG_MEDIANTABLESIZE
+                mag_medianTable1Z = [1] * MAG_MEDIANTABLESIZE
+                mag_medianTable2X = [1] * MAG_MEDIANTABLESIZE
+                mag_medianTable2Y = [1] * MAG_MEDIANTABLESIZE
+                mag_medianTable2Z = [1] * MAG_MEDIANTABLESIZE
+
+
+		#########################################
+        	#### Median filter for accelerometer ####
+        	#########################################
+        	# cycle the table
+        	for x in range (ACC_MEDIANTABLESIZE-1,0,-1 ):
+                	acc_medianTable1X[x] = acc_medianTable1X[x-1]
+                	acc_medianTable1Y[x] = acc_medianTable1Y[x-1]
+                	acc_medianTable1Z[x] = acc_medianTable1Z[x-1]
+
+		# The middle value is the value we are interested in
+                ACCx = acc_medianTable2X[ACC_MEDIANTABLESIZE/2];
+                ACCy = acc_medianTable2Y[ACC_MEDIANTABLESIZE/2];
+                ACCz = acc_medianTable2Z[ACC_MEDIANTABLESIZE/2];
+
+        	# Insert the lates values
+        	acc_medianTable1X[0] = ACCx
+        	acc_medianTable1Y[0] = ACCy
+        	acc_medianTable1Z[0] = ACCz
+
+        	# Copy the tables
+        	acc_medianTable2X = acc_medianTable1X[:]
+        	acc_medianTable2Y = acc_medianTable1Y[:]
+        	acc_medianTable2Z = acc_medianTable1Z[:]
+
+       		# Sort table 2
+        	acc_medianTable2X.sort()
+        	acc_medianTable2Y.sort()
+        	acc_medianTable2Z.sort()
+
+		 #Normalize accelerometer raw values.
+        	accXnorm = ACCx/math.sqrt(ACCx * ACCx + ACCy * ACCy + ACCz * ACCz)
+        	accYnorm = ACCy/math.sqrt(ACCx * ACCx + ACCy * ACCy + ACCz * ACCz)
+
+		#Calculate pitch and roll
+	        if self.IMU_upside_down :
+        	        self.accXnorm = -accXnorm                            #flip Xnorm as the IMU is upside down
+                	self.accYnorm = -accYnorm                            #flip Ynorm as the IMU is upside down
+                	pitch = math.asin(accXnorm)
+                	roll = math.asin(accYnorm/math.cos(pitch))
+        	else :
+                	pitch = math.asin(accXnorm)
+                	roll = -math.asin(accYnorm/math.cos(pitch))
+
+
+		#Calculate the new tilt compensated values
+	        magXcomp = MAGx*math.cos(pitch)+MAGz*math.sin(pitch)
+        	magYcomp = MAGx*math.sin(roll)*math.sin(pitch)+MAGy*math.cos(roll)-MAGz*math.sin(roll)*math.cos(pitch)
+
+       		#Calculate tilt compensated heading
+        	tiltCompensatedHeading = 180 * math.atan2(magYcomp,magXcomp)/M_PI
+
+        	#Only have our heading between 0 and 360
+        	if tiltCompensatedHeading < 0:
+                	tiltCompensatedHeading += 360
+		
+		return(tiltCompensatedHeading)
+
 imu = imuSystem()
+ 
 
-testvalue=imu.readMagneometer()
-
-print(str(testvalue))
+while True:
+	testvalue=imu.getBearing()
+	print(imu.getBearing())
+#	sleep(0.1)
+	print(str("%5.2f" %(testvalue)))
+	sleep(0.1)
