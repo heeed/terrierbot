@@ -4,7 +4,8 @@
 #
 # Contents sourced from ozzmaker examples
 
-import math
+import math,datetime
+from time import sleep
 
 MAG_ADDRESS	=	0x1E			
 ACC_ADDRESS	=	0x1E			
@@ -92,6 +93,24 @@ CLICK_THS	=	0x3A
 TIME_LIMIT	=	0x3B			
 TIME_LATENCY	=	0x3C			
 TIME_WINDOW	=	0x3D			
+#Kalman filter variables
+Q_angle = 0.02
+Q_gyro = 0.0015
+R_angle = 0.005
+y_bias = 0.0
+x_bias = 0.0
+XP_00 = 0.0
+XP_01 = 0.0
+XP_10 = 0.0
+XP_11 = 0.0
+YP_00 = 0.0
+YP_01 = 0.0
+YP_10 = 0.0
+YP_11 = 0.0
+KFangleX = 0.0
+KFangleY = 0.0
+a = 0
+
 
 class imuSystem:
 	IMU_upside_down = 0 #IMU_upside_down = 0, 1 = Upside down. This is when the skull logo is facing up 
@@ -154,8 +173,8 @@ class imuSystem:
                 oldXAccRawValue = 0
                 oldYAccRawValue = 0
                 oldZAccRawValue = 0
-
-                #a = datetime.datetime.now()
+		global a
+                a = datetime.datetime.now()
 
                 #IMU_upside_down = 0     # Change calculations depending on IMu orientation.
                                                 # 0 = Correct side up. This is when the skull logo is facing down
@@ -350,9 +369,24 @@ class imuSystem:
 		print("This is a test message")
 	
 	def getBearing(self):
+
+		global a
 	
 		ACCx = self.readACCx()
         	ACCy = self.readACCy()
+		ACCz = self.readACCz()
+        	GYRx = self.readGYRx()
+        	GYRy = self.readGYRy()
+        	GYRz = self.readGYRz()
+		
+		##Calculate loop Period(LP). How long between Gyro Reads
+	        b = datetime.datetime.now() - a
+        	a = datetime.datetime.now()
+        	LP = b.microseconds/(1000000*1.0)
+        	print "Loop Time | %5.2f|" % ( LP ),
+
+
+
 		MAGx = self.readMAGx()
                 MAGy = self.readMAGy()
                 MAGz = self.readMAGz()
@@ -360,7 +394,26 @@ class imuSystem:
         	MAG_MEDIANTABLESIZE = 9
 		RAD_TO_DEG = 57.29578
 	        M_PI = 3.14159265358979323846
+		G_GAIN = 0.070
+		AA =  0.40
+		IMU_upside_down = 0
+		gyroXangle = 0.0
+		gyroYangle = 0.0
+		gyroZangle = 0.0
+		CFangleX = 0.0
+		CFangleY = 0.0
+		CFangleXFiltered = 0.0
+		CFangleYFiltered = 0.0
+		kalmanX = 0.0
+		kalmanY = 0.0
+		oldXMagRawValue = 0
+		oldYMagRawValue = 0
+		oldZMagRawValue = 0
+		oldXAccRawValue = 0
+		oldYAccRawValue = 0
+		oldZAccRawValue = 0
 
+	
 
 		#Setup the tables for the mdeian filter. Fill them all with '1' soe we dont get device by zero error
                 acc_medianTable1X = [1] * ACC_MEDIANTABLESIZE
@@ -410,15 +463,72 @@ class imuSystem:
         	accXnorm = ACCx/math.sqrt(ACCx * ACCx + ACCy * ACCy + ACCz * ACCz)
         	accYnorm = ACCy/math.sqrt(ACCx * ACCx + ACCy * ACCy + ACCz * ACCz)
 
+		   # Change the rotation value of the accelerometer to -/+ 180 and move the Y axis '0' point to up
+
+ 	#Convert Gyro raw to degrees per second
+        	rate_gyr_x =  GYRx * G_GAIN
+        	rate_gyr_y =  GYRy * G_GAIN
+        	rate_gyr_z =  GYRz * G_GAIN
+
+
+        #Calculate the angles from the gyro. 
+        	gyroXangle+=rate_gyr_x*LP
+        	gyroYangle+=rate_gyr_y*LP
+        	gyroZangle+=rate_gyr_z*LP
+
+
+        ##Convert Accelerometer values to degrees
+        	AccXangle =  (math.atan2(ACCy,ACCz)+M_PI)*RAD_TO_DEG
+       		AccYangle =  (math.atan2(ACCz,ACCx)+M_PI)*RAD_TO_DEG
+
+		
+        # Change the rotation value of the accelerometer to -/+ 180 and move the Y axis '0' point to up
+        # Two different pieces of code are used depending on how your IMU is mounted
+		if IMU_upside_down :            # If IMU is upside down E.g Skull logo is facing up.
+                	if AccXangle >180:
+                        	AccXangle -= 360.0
+                        	AccYangle-=90
+                	if AccYangle >180:
+                        	AccYangle -= 360.0
+
+        	else :                                          # If IMU is up the correct way E.g Skull logo is facing down.
+                	AccXangle -= 180.0
+                	if AccYangle > 90:
+                        	AccYangle -= 270.0
+                	else:
+                        	AccYangle += 90.0
+
+
+
+        #Complementary filter used to combine the accelerometer and gyro values.
+        	CFangleX=AA*(CFangleX+rate_gyr_x*LP) +(1 - AA) * AccXangle
+        	CFangleY=AA*(CFangleY+rate_gyr_y*LP) +(1 - AA) * AccYangle
+
+        #Kalman filter used to combine the accelerometer and gyro values.
+        	kalmanY = self.kalmanFilterY(AccYangle, rate_gyr_y,LP)
+        	kalmanX = self.kalmanFilterX(AccXangle, rate_gyr_x,LP)
+
+
 		#Calculate pitch and roll
-	        if self.IMU_upside_down :
-        	        self.accXnorm = -accXnorm                            #flip Xnorm as the IMU is upside down
-                	self.accYnorm = -accYnorm                            #flip Ynorm as the IMU is upside down
+	        if IMU_upside_down :
+        	        accXnorm = -accXnorm                            #flip Xnorm as the IMU is upside down
+                	accYnorm = -accYnorm                            #flip Ynorm as the IMU is upside down
                 	pitch = math.asin(accXnorm)
                 	roll = math.asin(accYnorm/math.cos(pitch))
         	else :
                 	pitch = math.asin(accXnorm)
                 	roll = -math.asin(accYnorm/math.cos(pitch))
+
+
+                if IMU_upside_down :
+                	MAGy = -MAGy
+
+                #Calculate heading
+                heading = 180 * math.atan2(MAGy,MAGx)/M_PI
+
+                #Only have our heading between 0 and 360
+                if heading < 0:
+                    heading += 360
 
 
 		#Calculate the new tilt compensated values
@@ -431,5 +541,6 @@ class imuSystem:
         	#Only have our heading between 0 and 360
         	if tiltCompensatedHeading < 0:
                 	tiltCompensatedHeading += 360
-		
-		return(tiltCompensatedHeading)
+	        sleep(0.1)	
+		return(int(tiltCompensatedHeading))
+                #return(int(heading))
