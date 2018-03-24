@@ -109,38 +109,47 @@ YP_10 = 0.0
 YP_11 = 0.0
 KFangleX = 0.0
 KFangleY = 0.0
+MAG_LPF_FACTOR = 0.4    # Low pass filter constant magnetometer
+ACC_LPF_FACTOR = 0.4    # Low pass filter constant for accelerometer
+ACC_MEDIANTABLESIZE = 9         # Median filter table size for accelerometer. Higher = smoother but a longer delay
+MAG_MEDIANTABLESIZE = 9
+RAD_TO_DEG = 57.29578
+M_PI = 3.14159265358979323846
+G_GAIN = 0.070
+AA =  0.40
+IMU_upside_down = 0
+gyroXangle = 0.0
+gyroYangle = 0.0
+gyroZangle = 0.0
+CFangleX = 0.0
+CFangleY = 0.0
+CFangleXFiltered = 0.0
+CFangleYFiltered = 0.0
+kalmanX = 0.0
+kalmanY = 0.0
+oldXMagRawValue = 0
+oldYMagRawValue = 0
+oldZMagRawValue = 0
+oldXAccRawValue = 0
+oldYAccRawValue = 0
+oldZAccRawValue = 0
 a = 0
+#Setup the tables for the mdeian filter. Fill them all with '1' soe we dont get device by zero error
+acc_medianTable1X = [1] * ACC_MEDIANTABLESIZE
+acc_medianTable1Y = [1] * ACC_MEDIANTABLESIZE
+acc_medianTable1Z = [1] * ACC_MEDIANTABLESIZE
+acc_medianTable2X = [1] * ACC_MEDIANTABLESIZE
+acc_medianTable2Y = [1] * ACC_MEDIANTABLESIZE
+acc_medianTable2Z = [1] * ACC_MEDIANTABLESIZE
+mag_medianTable1X = [1] * MAG_MEDIANTABLESIZE
+mag_medianTable1Y = [1] * MAG_MEDIANTABLESIZE
+mag_medianTable1Z = [1] * MAG_MEDIANTABLESIZE
+mag_medianTable2X = [1] * MAG_MEDIANTABLESIZE
+mag_medianTable2Y = [1] * MAG_MEDIANTABLESIZE
+mag_medianTable2Z = [1] * MAG_MEDIANTABLESIZE
 
 
 class imuSystem:
-	IMU_upside_down = 0 #IMU_upside_down = 0, 1 = Upside down. This is when the skull logo is facing up 
-	
-	RAD_TO_DEG = 57.29578
-	M_PI = 3.14159265358979323846
-	G_GAIN = 0.070          # [deg/s/LSB]  If you change the dps for gyro, you need to update this value accordingly
-	AA =  0.40              # Complementary filter constant
-	MAG_LPF_FACTOR = 0.4    # Low pass filter constant magnetometer
-	ACC_LPF_FACTOR = 0.4    # Low pass filter constant for accelerometer
-	ACC_MEDIANTABLESIZE = 9         # Median filter table size for accelerometer. Higher = smoother but a longer delay
-	MAG_MEDIANTABLESIZE = 9         # Median filter table size for magnetometer. Higher = smoother but a longer delay
-
-	#Kalman filter variables
-	Q_angle = 0.02
-	Q_gyro = 0.0015
-	R_angle = 0.005
-	y_bias = 0.0
-	x_bias = 0.0
-	XP_00 = 0.0
-	XP_01 = 0.0
-	XP_10 = 0.0
-	XP_11 = 0.0
-	YP_00 = 0.0
-	YP_01 = 0.0
-	YP_10 = 0.0
-	YP_11 = 0.0
-	KFangleX = 0.0
-	KFangleY = 0.0
-
 
 	def __init__(self,bus):
 
@@ -157,29 +166,6 @@ class imuSystem:
                 #initialise the gyroscope
                 self.writeGRY(CTRL_REG1_G, 0b00001111) #Normal power mode, all axes enabled
                 self.writeGRY(CTRL_REG4_G, 0b00110000) #Continuos update, 2000 dps full scale
-
-                gyroXangle = 0.0
-                gyroYangle = 0.0
-                gyroZangle = 0.0
-                CFangleX = 0.0
-                CFangleY = 0.0
-                CFangleXFiltered = 0.0
-                CFangleYFiltered = 0.0
-                kalmanX = 0.0
-                kalmanY = 0.0
-                oldXMagRawValue = 0
-                oldYMagRawValue = 0
-                oldZMagRawValue = 0
-                oldXAccRawValue = 0
-                oldYAccRawValue = 0
-                oldZAccRawValue = 0
-		global a
-                a = datetime.datetime.now()
-
-                #IMU_upside_down = 0     # Change calculations depending on IMu orientation.
-                                                # 0 = Correct side up. This is when the skull logo is facing down
-                                                # 1 = Upside down. This is when the skull logo is facing up
-
 
 	def kalmanFilterY (self,accAngle, gyroRate, DT):
         	y=0.0
@@ -371,13 +357,35 @@ class imuSystem:
 	def getBearing(self):
 
 		global a
-	
+	        global MAG_LPF_FACTOR 
+		global ACC_LPF_FACTOR 
+
+                global acc_medianTable1X
+                global acc_medianTable1Y
+                global acc_medianTable1Z
+                global acc_medianTable2X
+                global acc_medianTable2Y
+                global acc_medianTable2Z
+                global mag_medianTable1X
+                global mag_medianTable1Y
+                global mag_medianTable1Z
+                global mag_medianTable2X
+                global mag_medianTable2Y
+                global mag_medianTable2Z
+
+
+		a = datetime.datetime.now()
+
 		ACCx = self.readACCx()
         	ACCy = self.readACCy()
 		ACCz = self.readACCz()
         	GYRx = self.readGYRx()
         	GYRy = self.readGYRy()
         	GYRz = self.readGYRz()
+                MAGx = self.readMAGx()
+                MAGy = self.readMAGy()
+                MAGz = self.readMAGz()
+
 		
 		##Calculate loop Period(LP). How long between Gyro Reads
 	        b = datetime.datetime.now() - a
@@ -385,11 +393,6 @@ class imuSystem:
         	LP = b.microseconds/(1000000*1.0)
         	print "Loop Time | %5.2f|" % ( LP ),
 
-
-
-		MAGx = self.readMAGx()
-                MAGy = self.readMAGy()
-                MAGz = self.readMAGz()
 		ACC_MEDIANTABLESIZE = 9         # Median filter table size for accelerometer. Higher = smoother but a longer delay
         	MAG_MEDIANTABLESIZE = 9
 		RAD_TO_DEG = 57.29578
@@ -412,23 +415,23 @@ class imuSystem:
 		oldXAccRawValue = 0
 		oldYAccRawValue = 0
 		oldZAccRawValue = 0
+		
+		############################################ 
+        	### Apply low pass filter ####
+        	##############################################
+		MAGx =  MAGx  * MAG_LPF_FACTOR + oldXMagRawValue*(1 - MAG_LPF_FACTOR);
+		MAGy =  MAGy  * MAG_LPF_FACTOR + oldYMagRawValue*(1 - MAG_LPF_FACTOR);
+		MAGz =  MAGz  * MAG_LPF_FACTOR + oldZMagRawValue*(1 - MAG_LPF_FACTOR);
+		ACCx =  ACCx  * ACC_LPF_FACTOR + oldXAccRawValue*(1 - ACC_LPF_FACTOR);
+		ACCy =  ACCy  * ACC_LPF_FACTOR + oldYAccRawValue*(1 - ACC_LPF_FACTOR);
+		ACCz =  ACCz  * ACC_LPF_FACTOR + oldZAccRawValue*(1 - ACC_LPF_FACTOR);
 
-	
-
-		#Setup the tables for the mdeian filter. Fill them all with '1' soe we dont get device by zero error
-                acc_medianTable1X = [1] * ACC_MEDIANTABLESIZE
-                acc_medianTable1Y = [1] * ACC_MEDIANTABLESIZE
-                acc_medianTable1Z = [1] * ACC_MEDIANTABLESIZE
-                acc_medianTable2X = [1] * ACC_MEDIANTABLESIZE
-                acc_medianTable2Y = [1] * ACC_MEDIANTABLESIZE
-                acc_medianTable2Z = [1] * ACC_MEDIANTABLESIZE
-                mag_medianTable1X = [1] * MAG_MEDIANTABLESIZE
-                mag_medianTable1Y = [1] * MAG_MEDIANTABLESIZE
-                mag_medianTable1Z = [1] * MAG_MEDIANTABLESIZE
-                mag_medianTable2X = [1] * MAG_MEDIANTABLESIZE
-                mag_medianTable2Y = [1] * MAG_MEDIANTABLESIZE
-                mag_medianTable2Z = [1] * MAG_MEDIANTABLESIZE
-
+		oldXMagRawValue = MAGx
+        	oldYMagRawValue = MAGy
+        	oldZMagRawValue = MAGz
+        	oldXAccRawValue = ACCx
+        	oldYAccRawValue = ACCy
+        	oldZAccRawValue = ACCz
 
 		#########################################
         	#### Median filter for accelerometer ####
@@ -438,11 +441,6 @@ class imuSystem:
                 	acc_medianTable1X[x] = acc_medianTable1X[x-1]
                 	acc_medianTable1Y[x] = acc_medianTable1Y[x-1]
                 	acc_medianTable1Z[x] = acc_medianTable1Z[x-1]
-
-		# The middle value is the value we are interested in
-                ACCx = acc_medianTable2X[ACC_MEDIANTABLESIZE/2];
-                ACCy = acc_medianTable2Y[ACC_MEDIANTABLESIZE/2];
-                ACCz = acc_medianTable2Z[ACC_MEDIANTABLESIZE/2];
 
         	# Insert the lates values
         	acc_medianTable1X[0] = ACCx
@@ -458,6 +456,11 @@ class imuSystem:
         	acc_medianTable2X.sort()
         	acc_medianTable2Y.sort()
         	acc_medianTable2Z.sort()
+	
+		# The middle value is the value we are interested in
+        	ACCx = acc_medianTable2X[ACC_MEDIANTABLESIZE/2];
+        	ACCy = acc_medianTable2Y[ACC_MEDIANTABLESIZE/2];
+        	ACCz = acc_medianTable2Z[ACC_MEDIANTABLESIZE/2];
 
 		 #Normalize accelerometer raw values.
         	accXnorm = ACCx/math.sqrt(ACCx * ACCx + ACCy * ACCy + ACCz * ACCz)

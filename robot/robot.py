@@ -22,12 +22,12 @@ except:
 try:
     while True:
         #keyp = pz.readkey()
-        if ord(keyp) == 3:
-            break
-        else:
+#        if ord(keyp) == 3:
+ #           break
+  #      else:
          #   pz.moveRobot(keyp,speed)
-            print(imu.getBearing())
-           # sleep(0.1)
+        print(imu.getBearing())
+        sleep(0.03)
          #   pz.spinRight(speed)
           #  sleep(1)
            # pz.stop()
