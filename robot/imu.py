@@ -391,7 +391,7 @@ class imuSystem:
 	        b = datetime.datetime.now() - a
         	a = datetime.datetime.now()
         	LP = b.microseconds/(1000000*1.0)
-        	print "Loop Time | %5.2f|" % ( LP ),
+        	#print "Loop Time | %5.2f|" % ( LP ),
 
 		ACC_MEDIANTABLESIZE = 9         # Median filter table size for accelerometer. Higher = smoother but a longer delay
         	MAG_MEDIANTABLESIZE = 9
