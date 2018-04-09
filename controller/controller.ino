@@ -20,19 +20,31 @@ All text above, and the splash screen must be included in any redistribution
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+ 
+#include <SoftwareSerial.h>
+SoftwareSerial BTserial(2, 3); // RX | TX
+
 
 //#define OLED_RESET 4
 Adafruit_SSD1306 display(4);
 
-int joyPin1 = 0;                 // slider variable connecetd to analog pin 0
-int joyPin2 = 1;                 // slider variable connecetd to analog pin 1
-int value1 = 0;                  // variable to read the value from the analog pin 0
-int value2 = 0;                  // variable to read the value from the analog pin 1
+const int ledPin =  13;    
+const int buttonUp = 12;
+const int buttonLeft = 11;
+const int buttonRight = 10;
+const int buttonDown = 9;
 
 
-void setup()   {                
+void setup()   { 
+  
+  pinMode(buttonUp, INPUT);
+  pinMode(buttonLeft, INPUT);
+  pinMode(buttonRight, INPUT);
+  pinMode(buttonDown, INPUT);
+              
   Serial.begin(9600);
-
+  BTserial.begin(9600);
+   
   // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3D (for the 128x64)
   // init done
@@ -43,12 +55,12 @@ void setup()   {
  // display.display();
   //delay(2000);
 
-  // Clear the buffer.
-  display.clearDisplay();
-
-  // draw a single pixel
-  display.drawPixel(10, 10, WHITE);
-  // Show the display buffer on the hardware.
+    // Clear the buffer.
+    display.clearDisplay();
+  
+    // draw a single pixel
+    display.drawPixel(10, 10, WHITE);
+    // Show the display buffer on the hardware.
   // NOTE: You _must_ call display after making any drawing commands
   // to make them visible on the display hardware!
   display.display();
@@ -70,36 +82,67 @@ void setup()   {
   display.clearDisplay();
 }
 
-
 void loop() {
-  // reads the value of the variable resistor 
-  value1 = analogRead(joyPin1);   
-  // this small pause is needed between reading
-  // analog pins, otherwise we get the same value twice
-  delay(100);             
-  // reads the value of the variable resistor 
-  value2 = analogRead(joyPin2);
-  delay(100);
 
-  Serial.print("J: ");
-  Serial.print(value1);
-  Serial.print(" : ");
-  Serial.print(value2);
+  //Serial.println("Terrierbot");
+  
+  if (digitalRead(buttonUp) == HIGH) {
+    //Serial.println("up");
+    BTserial.print("up");
+  }
+  else if (digitalRead(buttonLeft) == HIGH)
+  {
+    //Serial.println("Left");
+    BTserial.print("left");
+  }
+  else if (digitalRead(buttonRight) == HIGH)
+  {
+    //Serial.println("Right");
+    BTserial.print("right");
+  }
+  else if (digitalRead(buttonDown) == HIGH)
+  {
+    //Serial.println("Down");
+    BTserial.print("down");
+  }
+
+
+  
+ //transmitDetails(info);
+ 
+ delay(100);
+}
+
+void transmitDetails(String joyY)
+{
+  BTserial.print(joyY);
+}
+
+void send_state(){
+ 
+ 
+ BTserial.write('S');
+ BTserial.write('E');
+ return;
+}
+
+void mainDisplay()
+{
+
+ 
+  //BTserial.print(joyX);
+  //BTserial.println(Serial.readBytes(buffer,5));
   Serial.println("");
-  String labelX = "X: ";
-  String labelY = "Y: ";
-  String xState = labelX + value1;
-  String yState = labelY + value2;
-  Serial.println(xState);
-  Serial.println(yState);
+  //Serial.println(xState);
+  //Serial.println(yState);
   display.clearDisplay();
   display.setCursor(0,0);
   display.setTextSize(1);
-  display.println(xState);
-  display.println(yState);
+
   display.setCursor(0,56);
-  display.println("terrierbot v0.1");
+  display.println("terrierbot v0.01");
   display.display();
   delay(100);
+
 }
 
