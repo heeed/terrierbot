@@ -22,54 +22,111 @@ blueConn= serial.Serial(
 def blueConnection():
     while True:
         blueMsg=blueConn.readline()
-        #print(blueMsg)
+        if len(blueMsg)>0:
+            screenMessage.printMsg(blueMsg)
 	if blueMsg == "up":
-            print("Up")
             pz.forward(speed)
             sleep(0.5)
             pz.stop()
             #break
         elif blueMsg == "down":
-            print("Down")
             pz.reverse(speed)
             sleep(0.5)
             pz.stop
 
         elif blueMsg=="right":
-            print("right")
             pz.spinRight(speed)
             sleep(0.5)
             pz.stop()
 
         elif blueMsg=="left":
-            print("left")
             pz.spinLeft(speed)
             sleep(0.5)
             pz.stop()
         else:
             pz.stop()
-        #       pz.stop()
         sleep(0.1)
+
+class keyBoardControl(threading.Thread):
+    def run(self):
+        return
+    def readKey(self,target,controlTarget):
+        while True:
+            try:
+                keyp=pz.readkey()
+                target.printMsg(keyp)
+	        if keyp == 'w' or ord(keyp) == 16:
+        		controlTarget.forward(speed)
+            	#	print('Forward', speed)
+        	elif keyp == 'z' or ord(keyp) == 17:
+            		controlTarget.reverse(speed)
+            	#	print('Reverse', speed)
+        	elif keyp == 's' or ord(keyp) == 18:
+            		controlTarget.right(speed)
+            	#	print('Spin Right', speed)
+        	elif keyp == 'a' or ord(keyp) == 19:
+            		controlTarget.left(speed)
+            	#	print('Spin Left', speed)
+        	#elif keyp == '.' or keyp == '>':
+           	#	speed = min(100, speed+10)
+            	#	print('Speed+', speed)
+        	#elif keyp == ',' or keyp == '<':
+            	#	speed = max (0, speed-10)
+            	#	print('Speed-', speed)
+        	#elif keyp == ' ':
+            	#	pz.stop()
+            	#	print('Stop')
+        	elif ord(keyp) == 3:
+            		break
+               
+ 
+            except KeyboardInterrupt:
+                break
+
+class displayMsg(threading.Thread):
+    def run(self):
+        return
+        
+    def printMsg(self,msg):
+        print(msg)
+
+class robotMove():
+    def forward(self,speed):
+        pz.forward(speed)
+    def reverse(self, speed):
+        pz.reverse(speed)
+    def left(self,speed):
+        pz.spinLeft(speed)
+    def right(self,speed):
+        pz.spinRight(speed)
+    def stop():
+        pz.stop()
 
 
 print('Connected')
 d = threading.Thread(name='daemon', target=blueConnection)
 d.setDaemon(True)
-
+screenMessage=displayMsg()
+kb=keyBoardControl()
+conn=robotMove()
 
 try:
         pz.init()
 	imu = imu.imuSystem(bus)
 	imu.getBearing()
+        
 except:
 	print "IMU sensor not found"
 	sys.exit()
 
 try:
 	d.start()
-	
+	screenMessage.start()
+        kb.start()
+        kb.readKey(screenMessage,conn)
+
    	while True:
-		print("Still running")
+	#	("Still running")
 #	d = threading.Thread(name='daemon', target=daemon)
 		
 #        keyp  = pz.readkey()
