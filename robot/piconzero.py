@@ -143,12 +143,12 @@ def reverse (speed):
     setMotor (1, -speed)
 
 def spinLeft (speed):
-    setMotor (0, -speed)
-    setMotor (1, speed)
-
-def spinRight (speed):
     setMotor (0, speed)
     setMotor (1, -speed)
+
+def spinRight (speed):
+    setMotor (0, -speed)
+    setMotor (1, speed)
 
 def stop():
     setMotor (0, 0)
